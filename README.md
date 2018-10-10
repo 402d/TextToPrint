@@ -13,7 +13,7 @@ Font D - the smallest (80 characters per line on A4 printer)
 
 The application DOES NOT PRINT yourself. By the print button, a standard PrintDocumentAdapter for WebView is created.
 
-##How to use the example of the clipboard.
+## How to use the example of the clipboard.
 Select text -> Share -> TextToPrint -> Printer Icon -> Standard Print Preview Dialog.
 
 ## App in Market
