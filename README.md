@@ -7,6 +7,8 @@ I did it for them.
 The application is the simplest. One screen. WebView and print button.
 Gets text through the processing of Intent.View and Intent.SEND ("Open with" and "Share"). Having received the text makes it the simplest html.
 
+**see** [createWebPrintJob()](https://github.com/402d/TextToPrint/blob/master/app/src/main/java/ru/a402d/texttoprint/MainActivity.java#L327)
+
 In the settings 4 font sizes.
 Font A and Font B are suitable for printing on a thermal printer (58mm roll of cash tape)
 Font D - the smallest (80 characters per line on A4 printer)
