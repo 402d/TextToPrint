@@ -16,5 +16,7 @@ The application DOES NOT PRINT yourself. By the print button, a standard PrintDo
 ## How to use the example of the clipboard.
 Select text -> Share -> TextToPrint -> Printer Icon -> Standard Print Preview Dialog.
 
-## App in Market
-[ru.a402d.texttoprint](https://play.google.com/store/apps/details?id=ru.a402d.texttoprint)
+## TextToPrint on Google Play
+<a href="https://play.google.com/store/apps/details?id=ru.a402d.texttoprint" target="_blank"><img src="https://play.google.com/intl/en_us/badges/images/badge_new.png" alt="Get it on Google Play" height="46"></a>
+
+
