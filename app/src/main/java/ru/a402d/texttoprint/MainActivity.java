@@ -57,25 +57,7 @@ public class MainActivity extends AppCompatActivity implements BillingProcessor.
             "</style>" +
             "</head>" +
             "<body>" ;
-    String htmlBody=
-            "<h2>Text To Print</h2>" +
-                    "<p>It is very simle app.</p>" +
-                    "<ul>" +
-                    "<li>Receive Intent.SEND or Intent.VIEW with text/plain</li>" +
-                    "<li>Place text into WebVIEW</li>" +
-                    "<li>Create print document adapter</li>" +
-                    "</ul>" +
-                    "<b>Font A (32 chars on 58mm Roll)</b><br>" +
-                    "123456789 123456789 123456789 12<br><br>" +
-                    "<b>Font B (42 chars on 58mm Roll)</b><br>" +
-                    "123456789 123456789 123456789 123456789 12<br><br>" +
-                    "<b>Font C (65 chars in line on A4)</b><br>" +
-                    "123456789 123456789 123456789 123456789 123456789 123456789 12345<br><br>" +
-                    "<b>Font D (80 chars in line on A4)</b><br>" +
-                    "123456789 123456789 123456789 123456789 123456789 123456789 123456789 1234567890<br><br>" +
-                    "Lorem Ipsum - это текст-рыба, часто используемый в печати и вэб-дизайне. Lorem Ipsum является стандартной \"рыбой\" для текстов на латинице с начала XVI века. В то время некий безымянный печатник создал большую коллекцию размеров и форм шрифтов, используя Lorem Ipsum для распечатки образцов.<br><br>" +
-                    "O Lorem Ipsum é um texto modelo da indústria tipográfica e de impressão. O Lorem Ipsum tem vindo a ser o texto padrão usado por estas indústrias desde o ano de 1500, quando uma misturou os caracteres de um texto para criar um espécime de livro.<br><br>" +
-                    "Lorem Ipsum adalah contoh teks atau dummy dalam industri percetakan dan penataan huruf atau typesetting. Lorem Ipsum telah menjadi standar contoh teks sejak tahun 1500an, saat seorang tukang cetak yang tidak dikenal mengambil sebuah kumpulan teks dan mengacaknya untuk menjadi sebuah buku contoh huruf. <br><br>" ;
+    String htmlBody;
     String htmlFooter="</body></html>";
 
     WebView webView;
@@ -101,9 +83,31 @@ public class MainActivity extends AppCompatActivity implements BillingProcessor.
 
         webView =  findViewById(R.id.wview);
 
+        htmlBody = readAssets("html.html");
+
         sPref = getPreferences(MODE_PRIVATE);
         int savedSize = sPref.getInt(SAVED_SIZE, 1);
         setFont(savedSize);
+
+    }
+
+    // read html body from assets
+    private String readAssets(String fileName){
+        try {
+            StringBuilder buf = new StringBuilder();
+            InputStream inputStream = getAssets().open(fileName);
+            BufferedReader in =
+                    new BufferedReader(new InputStreamReader(inputStream, "UTF-8"));
+            String str;
+
+            while ((str = in.readLine()) != null) {
+                buf.append(str);
+            }
+            in.close();
+            return buf.toString();
+        }catch (Exception e){
+            return "";
+        }
 
     }
 
