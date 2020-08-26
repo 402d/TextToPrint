@@ -1,5 +1,5 @@
 <resources>
     <string name="app_name">TextToPrint</string>
-    <string name="action_settings">Settings</string>
     <string name="title_activity_main">TextToPrint</string>
+    <string name="no_bp">Billing not available</string>
 </resources>

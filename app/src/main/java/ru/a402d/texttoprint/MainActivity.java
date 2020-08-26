@@ -17,24 +17,26 @@ import android.print.PrintDocumentAdapter;
 import android.print.PrintManager;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
-import android.support.design.widget.FloatingActionButton;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.webkit.WebView;
+import android.widget.Toast;
 
 import com.anjlab.android.iab.v3.BillingProcessor;
 import com.anjlab.android.iab.v3.TransactionDetails;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Objects;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 
 public class MainActivity extends AppCompatActivity implements BillingProcessor.IBillingHandler  {
     private double fontSize = 17;
@@ -46,7 +48,7 @@ public class MainActivity extends AppCompatActivity implements BillingProcessor.
 
     private static BillingProcessor bp = null;
 
-    String htmlHead = "<html>" +
+    final String htmlHead = "<html>" +
             "<head>" +
             "<style>" +
             "html,body{margin:0;padding:0;font-size:%.3fpx;}" +
@@ -58,7 +60,7 @@ public class MainActivity extends AppCompatActivity implements BillingProcessor.
             "</head>" +
             "<body>" ;
     String htmlBody;
-    String htmlFooter="</body></html>";
+    final String htmlFooter="</body></html>";
 
     WebView webView;
     @Override
@@ -92,12 +94,12 @@ public class MainActivity extends AppCompatActivity implements BillingProcessor.
     }
 
     // read html body from assets
-    private String readAssets(String fileName){
+    private String readAssets(@SuppressWarnings("SameParameterValue") String fileName){
         try {
             StringBuilder buf = new StringBuilder();
             InputStream inputStream = getAssets().open(fileName);
             BufferedReader in =
-                    new BufferedReader(new InputStreamReader(inputStream, "UTF-8"));
+                    new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
             String str;
 
             while ((str = in.readLine()) != null) {
@@ -228,7 +230,11 @@ public class MainActivity extends AppCompatActivity implements BillingProcessor.
             saveFont(4);
             setFont(4);
         }else if(id==6){
-            bp.purchase(this,"coffee");
+            if(bp!=null) {
+                bp.purchase(this, "coffee");
+            }else{
+                Toast.makeText(this, R.string.no_bp,Toast.LENGTH_SHORT).show();
+            }
         }
         return super.onOptionsItemSelected(item);
     }
@@ -266,13 +272,11 @@ public class MainActivity extends AppCompatActivity implements BillingProcessor.
 
     @Override
     public void onRequestPermissionsResult(int requestCode,
-                                           @NonNull String permissions[], @NonNull int[] grantResults) {
-        switch (requestCode) {
-            case  MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE: {
-                if (grantResults.length > 0
-                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    parseIntent(getIntent());
-                }
+                                           @NonNull String[] permissions, @NonNull int[] grantResults) {
+        if (requestCode == MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE) {
+            if (grantResults.length > 0
+                    && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                parseIntent(getIntent());
             }
         }
     }
@@ -300,7 +304,7 @@ public class MainActivity extends AppCompatActivity implements BillingProcessor.
     }
 
 
-    public class PrintDocumentAdapterWrapper extends PrintDocumentAdapter{
+    public static class PrintDocumentAdapterWrapper extends PrintDocumentAdapter{
 
         private final PrintDocumentAdapter delegate;
         PrintDocumentAdapterWrapper(PrintDocumentAdapter adapter){
