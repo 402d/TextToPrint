@@ -2,6 +2,7 @@ package ru.a402d.texttoprint;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -22,13 +23,16 @@ import android.support.annotation.Nullable;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.View;
 import android.webkit.WebView;
 import android.widget.Toast;
 
 import com.anjlab.android.iab.v3.BillingProcessor;
 import com.anjlab.android.iab.v3.TransactionDetails;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.play.core.review.ReviewInfo;
+import com.google.android.play.core.review.ReviewManager;
+import com.google.android.play.core.review.ReviewManagerFactory;
+import com.google.android.play.core.tasks.Task;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -43,6 +47,7 @@ import androidx.appcompat.widget.Toolbar;
 import androidx.core.view.MenuCompat;
 
 public class MainActivity extends AppCompatActivity implements BillingProcessor.IBillingHandler {
+    private final static String TAG = "Antson";
     private double fontSize = 17;
     private double printFontSize = 26;
     private static final int MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE = 777;
@@ -76,12 +81,7 @@ public class MainActivity extends AppCompatActivity implements BillingProcessor.
         setSupportActionBar(toolbar);
 
         FloatingActionButton fab = findViewById(R.id.fab);
-        fab.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                createWebPrintJob(webView);
-            }
-        });
+        fab.setOnClickListener(view -> createWebPrintJob(webView));
 
         if (BillingProcessor.isIabServiceAvailable(this)) {
             bp = new BillingProcessor(this, "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAi7uF/oUlFp8wDgjbbCYvBZ7zPwtcxqx4GFUm2hv+awP4zJBYLbYYeNMlfItpuqPx3z8Mjf+uLoJ68QDv23opG/nye5SFqdo6ly23k0wQGyyAAEBAGGBwOSrXX93INglHrXYohQW103oChFlw09FQ4IZ+5vBIRDv1/Qs3Nl/7Ii1rhXQ8rq+iHDNpAb9v1kNZRqmFO9qf+C+0cdiArWE+LEJ1K1IpnLZoqG7y+jX2xej53izjgtLWLU7w/2Umt2DkLd18qDQPr4itAlBWgxvvowxtOnut30NHP6df29hAbv4UUQGw4PzY4EbQ4set7pRpE/wGq6kQxKYWkD8QJm3QZwIDAQAB", this);
@@ -207,6 +207,7 @@ public class MainActivity extends AppCompatActivity implements BillingProcessor.
         menu.add(2, 4, 8, "Font C");
         menu.add(2, 5, 9, "Font D");
         menu.add(4, 6, 13, "Buy me a coffee");
+        menu.add(4, 10, 14, "Rate the app");
         return super.onCreateOptionsMenu(menu);
     }
 
@@ -256,7 +257,23 @@ public class MainActivity extends AppCompatActivity implements BillingProcessor.
                 e.getStackTrace();
             }
 
-
+        }else if(id == 10) {
+            // Rate the app
+            Activity activity = this;
+            Log.i(TAG,"Rate start");
+            ReviewManager manager = ReviewManagerFactory.create(activity);
+            Task<ReviewInfo> request = manager.requestReviewFlow();
+            request.addOnCompleteListener(task -> {
+                if (task.isSuccessful()) {
+                    // We can get the ReviewInfo object
+                    ReviewInfo reviewInfo = task.getResult();
+                    Task<Void> flow = manager.launchReviewFlow(activity, reviewInfo);
+                    flow.addOnCompleteListener(task1 -> Log.i(TAG,"Rate flow is success"));
+                } else {
+                    // There was some problem, continue regardless of the result.
+                    Log.e(TAG,"Rate not available");
+                }
+            });
         }
         return super.onOptionsItemSelected(item);
     }
@@ -338,18 +355,18 @@ public class MainActivity extends AppCompatActivity implements BillingProcessor.
         @Override
         public void onLayout(PrintAttributes oldAttributes, PrintAttributes newAttributes, CancellationSignal cancellationSignal, LayoutResultCallback callback, Bundle extras) {
             delegate.onLayout(oldAttributes, newAttributes, cancellationSignal, callback, extras);
-            Log.d("ANTSON", "onLayout");
+            Log.d(TAG, "onLayout");
         }
 
         @Override
         public void onWrite(PageRange[] pages, ParcelFileDescriptor destination, CancellationSignal cancellationSignal, WriteResultCallback callback) {
             delegate.onWrite(pages, destination, cancellationSignal, callback);
-            Log.d("ANTSON", "onWrite");
+            Log.d(TAG, "onWrite");
         }
 
         public void onFinish() {
             delegate.onFinish();
-            Log.d("ANTSON", "onFinish");
+            Log.d(TAG, "onFinish");
         }
 
     }
