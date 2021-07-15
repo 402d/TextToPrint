@@ -13,21 +13,33 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.CancellationSignal;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.ParcelFileDescriptor;
 import android.print.PageRange;
 import android.print.PrintAttributes;
 import android.print.PrintDocumentAdapter;
 import android.print.PrintManager;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.webkit.WebView;
 import android.widget.Toast;
 
-import com.anjlab.android.iab.v3.BillingProcessor;
-import com.anjlab.android.iab.v3.TransactionDetails;
+import com.android.billingclient.api.BillingClient;
+import com.android.billingclient.api.BillingClientStateListener;
+import com.android.billingclient.api.BillingFlowParams;
+import com.android.billingclient.api.BillingResult;
+
+import static com.android.billingclient.api.BillingClient.BillingResponseCode.OK;
+
+import com.android.billingclient.api.ConsumeParams;
+import com.android.billingclient.api.ConsumeResponseListener;
+import com.android.billingclient.api.Purchase;
+import com.android.billingclient.api.PurchasesResponseListener;
+import com.android.billingclient.api.PurchasesUpdatedListener;
+import com.android.billingclient.api.SkuDetails;
+import com.android.billingclient.api.SkuDetailsParams;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.play.core.review.ReviewInfo;
 import com.google.android.play.core.review.ReviewManager;
@@ -39,14 +51,17 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.view.MenuCompat;
 
-public class MainActivity extends AppCompatActivity implements BillingProcessor.IBillingHandler {
+public class MainActivity extends AppCompatActivity  {
     private final static String TAG = "Antson";
     private double fontSize = 17;
     private double printFontSize = 26;
@@ -54,8 +69,6 @@ public class MainActivity extends AppCompatActivity implements BillingProcessor.
 
     SharedPreferences sPref;
     final String SAVED_SIZE = "saved_size";
-
-    private static BillingProcessor bp = null;
 
     final String htmlHead = "<html>" +
             "<head>" +
@@ -73,6 +86,82 @@ public class MainActivity extends AppCompatActivity implements BillingProcessor.
 
     WebView webView;
 
+    // ---------- billing ----------------
+    BillingClient billingClient;
+    static final String SKU_NAME = "coffee";
+    SkuDetails coffee = null;
+
+    private  final BillingClientStateListener billingClientStateListener = new BillingClientStateListener() {
+        @Override
+        public void onBillingSetupFinished(@androidx.annotation.NonNull BillingResult billingResult) {
+            if (billingResult.getResponseCode() == OK) {
+
+                // sku for sale
+                List<String> skuList = new ArrayList<> ();
+                skuList.add(SKU_NAME);
+                SkuDetailsParams.Builder params = SkuDetailsParams.newBuilder();
+                params.setSkusList(skuList).setType(BillingClient.SkuType.INAPP);
+                billingClient.querySkuDetailsAsync(params.build(),
+                        (billingResultQuerySku, skuDetailsList) -> {
+                            if(billingResultQuerySku.getResponseCode() == OK && skuDetailsList != null){
+                                    coffee = skuDetailsList.get(0);
+                            }
+                        });
+
+
+                // slow payment
+                billingClient.queryPurchasesAsync(BillingClient.SkuType.INAPP, (billingResultPurchases, list) -> {
+                    if(billingResultPurchases.getResponseCode() == OK) {
+                        for(Purchase purchase: list) {
+                            if (purchase.getPurchaseState() == Purchase.PurchaseState.PURCHASED) {
+                                ConsumeParams.Builder param = ConsumeParams.newBuilder();
+                                param.setPurchaseToken(purchase.getPurchaseToken());
+                                billingClient.consumeAsync(param.build(), (billingResult1, s) -> (new Handler(Looper.getMainLooper())).post(()-> webView.loadData(String.format(Locale.US, htmlHead, fontSize, printFontSize) + "<h1>Thanks !</h1>" + htmlFooter, "text/html; charset=utf-8", "utf-8")));
+                            }
+                        }
+                    }
+                });
+
+
+            }
+        }
+
+        @Override
+        public void onBillingServiceDisconnected() {
+            (new Handler(Looper.getMainLooper())).postDelayed(()->{
+                try{
+                    billingClient.startConnection(billingClientStateListener);
+                }catch (Exception ignored){}
+            },5000);
+        }
+    };
+
+
+    // fast payment
+    private final PurchasesUpdatedListener purchasesUpdatedListener = (billingResult, purchases) -> {
+        if(billingResult.getResponseCode() == OK && purchases!=null && purchases.size()>0) {
+            for(Purchase purchase: purchases) {
+                if (purchase.getPurchaseState() == Purchase.PurchaseState.PURCHASED) {
+                    ConsumeParams.Builder param = ConsumeParams.newBuilder();
+                    param.setPurchaseToken(purchase.getPurchaseToken());
+                    billingClient.consumeAsync(param.build(), new ConsumeResponseListener() {
+                        @Override
+                        public void onConsumeResponse(@NonNull BillingResult billingResult, @NonNull String s) {
+
+                            (new Handler(Looper.getMainLooper())).post(()-> webView.loadData(String.format(Locale.US, htmlHead, fontSize, printFontSize) + "<h1>Thanks !</h1>" + htmlFooter, "text/html; charset=utf-8", "utf-8"));
+
+                        }
+                    });
+                }
+            }
+        }
+    };
+
+
+    // ------------------------------------
+
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -83,10 +172,13 @@ public class MainActivity extends AppCompatActivity implements BillingProcessor.
         FloatingActionButton fab = findViewById(R.id.fab);
         fab.setOnClickListener(view -> createWebPrintJob(webView));
 
-        if (BillingProcessor.isIabServiceAvailable(this)) {
-            bp = new BillingProcessor(this, "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAi7uF/oUlFp8wDgjbbCYvBZ7zPwtcxqx4GFUm2hv+awP4zJBYLbYYeNMlfItpuqPx3z8Mjf+uLoJ68QDv23opG/nye5SFqdo6ly23k0wQGyyAAEBAGGBwOSrXX93INglHrXYohQW103oChFlw09FQ4IZ+5vBIRDv1/Qs3Nl/7Ii1rhXQ8rq+iHDNpAb9v1kNZRqmFO9qf+C+0cdiArWE+LEJ1K1IpnLZoqG7y+jX2xej53izjgtLWLU7w/2Umt2DkLd18qDQPr4itAlBWgxvvowxtOnut30NHP6df29hAbv4UUQGw4PzY4EbQ4set7pRpE/wGq6kQxKYWkD8QJm3QZwIDAQAB", this);
-            bp.initialize();
-        }
+        // ---- billing init --------
+        billingClient = BillingClient.newBuilder(this)
+                .setListener(purchasesUpdatedListener)
+                .enablePendingPurchases()
+                .build();
+        billingClient.startConnection(billingClientStateListener);
+        // -------------------
 
         webView = findViewById(R.id.wview);
 
@@ -239,11 +331,19 @@ public class MainActivity extends AppCompatActivity implements BillingProcessor.
             saveFont(4);
             setFont(4);
         } else if (id == 6) {
-            if (bp != null) {
-                bp.purchase(this, "coffee");
+            // -------- purchase ---
+            if (coffee != null) {
+
+                BillingFlowParams billingFlowParams = BillingFlowParams.newBuilder()
+                        .setSkuDetails(coffee)
+                        .build();
+
+                billingClient.launchBillingFlow(this, billingFlowParams);
+
             } else {
                 Toast.makeText(this, R.string.no_bp, Toast.LENGTH_SHORT).show();
             }
+            // -------------------
         } else if (id == 7) {
             htmlBody = readAssets("html.html");
             webView.loadData(String.format(Locale.US, htmlHead, fontSize, printFontSize) + htmlBody + htmlFooter, "text/html; charset=utf-8", "utf-8");
@@ -320,27 +420,6 @@ public class MainActivity extends AppCompatActivity implements BillingProcessor.
         }
     }
 
-
-    @Override
-    public void onProductPurchased(@NonNull String productId, @Nullable TransactionDetails details) {
-        webView.loadData(String.format(Locale.US, htmlHead, fontSize, printFontSize) + "<h1>Thanks !</h1>" + htmlFooter, "text/html; charset=utf-8", "utf-8");
-        bp.consumePurchase(productId);
-    }
-
-    @Override
-    public void onPurchaseHistoryRestored() {
-
-    }
-
-    @Override
-    public void onBillingError(int errorCode, @Nullable Throwable error) {
-
-    }
-
-    @Override
-    public void onBillingInitialized() {
-
-    }
 
 
     public static class PrintDocumentAdapterWrapper extends PrintDocumentAdapter {
