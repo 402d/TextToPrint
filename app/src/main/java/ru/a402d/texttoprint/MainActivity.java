@@ -35,11 +35,11 @@ import static com.android.billingclient.api.BillingClient.BillingResponseCode.OK
 
 import com.android.billingclient.api.ConsumeParams;
 import com.android.billingclient.api.ConsumeResponseListener;
+import com.android.billingclient.api.ProductDetails;
 import com.android.billingclient.api.Purchase;
-import com.android.billingclient.api.PurchasesResponseListener;
 import com.android.billingclient.api.PurchasesUpdatedListener;
-import com.android.billingclient.api.SkuDetails;
-import com.android.billingclient.api.SkuDetailsParams;
+import com.android.billingclient.api.QueryProductDetailsParams;
+import com.android.billingclient.api.QueryPurchasesParams;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.play.core.review.ReviewInfo;
 import com.google.android.play.core.review.ReviewManager;
@@ -89,7 +89,7 @@ public class MainActivity extends AppCompatActivity  {
     // ---------- billing ----------------
     BillingClient billingClient;
     static final String SKU_NAME = "coffee";
-    SkuDetails coffee = null;
+    ProductDetails coffee = null;
 
     private  final BillingClientStateListener billingClientStateListener = new BillingClientStateListener() {
         @Override
@@ -97,20 +97,22 @@ public class MainActivity extends AppCompatActivity  {
             if (billingResult.getResponseCode() == OK) {
 
                 // sku for sale
-                List<String> skuList = new ArrayList<> ();
-                skuList.add(SKU_NAME);
-                SkuDetailsParams.Builder params = SkuDetailsParams.newBuilder();
-                params.setSkusList(skuList).setType(BillingClient.SkuType.INAPP);
-                billingClient.querySkuDetailsAsync(params.build(),
-                        (billingResultQuerySku, skuDetailsList) -> {
-                            if(billingResultQuerySku.getResponseCode() == OK && skuDetailsList != null){
-                                    coffee = skuDetailsList.get(0);
-                            }
-                        });
+                List<QueryProductDetailsParams.Product> skuList = new ArrayList<> ();
+                skuList.add(QueryProductDetailsParams.Product.newBuilder().setProductId(SKU_NAME).setProductType(BillingClient.ProductType.INAPP).build());
+                QueryProductDetailsParams.Builder  params = QueryProductDetailsParams.newBuilder();
+                params.setProductList(skuList);
+                billingClient.queryProductDetailsAsync(params.build(), (billingResult12, list) -> {
+                    if(billingResult12.getResponseCode() == OK ){
+                        coffee = list.get(0);
+                    }
+                }
+                );
 
 
                 // slow payment
-                billingClient.queryPurchasesAsync(BillingClient.SkuType.INAPP, (billingResultPurchases, list) -> {
+                billingClient.queryPurchasesAsync(
+                        QueryPurchasesParams.newBuilder().setProductType(BillingClient.ProductType.INAPP).build(),
+                        (billingResultPurchases, list) -> {
                     if(billingResultPurchases.getResponseCode() == OK) {
                         for(Purchase purchase: list) {
                             if (purchase.getPurchaseState() == Purchase.PurchaseState.PURCHASED) {
@@ -238,7 +240,7 @@ public class MainActivity extends AppCompatActivity  {
                 fileBePrinted(uri);
                 return;
             }
-            if (stringText == null || stringText.trim().length() <= 0) {
+            if (stringText == null || stringText.trim().length() == 0) {
                 webView.loadData(String.format(Locale.US, htmlHead, fontSize, printFontSize) + htmlBody + htmlFooter, "text/html; charset=utf-8", "utf-8");
                 return;
             }
@@ -286,7 +288,7 @@ public class MainActivity extends AppCompatActivity  {
     }
 
 
-    public boolean onCreateOptionsMenu(Menu menu) {
+    public boolean onCreateOptionsMenu(@NonNull Menu menu) {
         MenuCompat.setGroupDividerEnabled(menu, true);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -334,11 +336,19 @@ public class MainActivity extends AppCompatActivity  {
             // -------- purchase ---
             if (coffee != null) {
 
+                ArrayList<BillingFlowParams.ProductDetailsParams> productList = new ArrayList<>();
+
+                productList.add(
+                        BillingFlowParams.ProductDetailsParams.newBuilder()
+                                .setProductDetails(coffee)
+                                .build());
+
                 BillingFlowParams billingFlowParams = BillingFlowParams.newBuilder()
-                        .setSkuDetails(coffee)
+                        .setProductDetailsParamsList(productList)
                         .build();
 
                 billingClient.launchBillingFlow(this, billingFlowParams);
+
 
             } else {
                 Toast.makeText(this, R.string.no_bp, Toast.LENGTH_SHORT).show();
@@ -412,6 +422,7 @@ public class MainActivity extends AppCompatActivity  {
     @Override
     public void onRequestPermissionsResult(int requestCode,
                                            @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE) {
             if (grantResults.length > 0
                     && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
