@@ -2,7 +2,6 @@ package ru.a402d.texttoprint;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
-import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -13,8 +12,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.CancellationSignal;
-import android.os.Handler;
-import android.os.Looper;
 import android.os.ParcelFileDescriptor;
 import android.print.PageRange;
 import android.print.PrintAttributes;
@@ -24,35 +21,11 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.webkit.WebView;
-import android.widget.Toast;
-
-import com.android.billingclient.api.BillingClient;
-import com.android.billingclient.api.BillingClientStateListener;
-import com.android.billingclient.api.BillingFlowParams;
-import com.android.billingclient.api.BillingResult;
-
-import static com.android.billingclient.api.BillingClient.BillingResponseCode.OK;
-
-import com.android.billingclient.api.ConsumeParams;
-import com.android.billingclient.api.ConsumeResponseListener;
-import com.android.billingclient.api.ProductDetails;
-import com.android.billingclient.api.Purchase;
-import com.android.billingclient.api.PurchasesUpdatedListener;
-import com.android.billingclient.api.QueryProductDetailsParams;
-import com.android.billingclient.api.QueryPurchasesParams;
-import com.google.android.gms.tasks.Task;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
-import com.google.android.play.core.review.ReviewInfo;
-import com.google.android.play.core.review.ReviewManager;
-import com.google.android.play.core.review.ReviewManagerFactory;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -60,6 +33,8 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.view.MenuCompat;
+
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 public class MainActivity extends AppCompatActivity  {
     private final static String TAG = "Antson";
@@ -86,83 +61,9 @@ public class MainActivity extends AppCompatActivity  {
 
     WebView webView;
 
-    // ---------- billing ----------------
-    BillingClient billingClient;
-    static final String SKU_NAME = "coffee";
-    ProductDetails coffee = null;
-
-    private  final BillingClientStateListener billingClientStateListener = new BillingClientStateListener() {
-        @Override
-        public void onBillingSetupFinished(@androidx.annotation.NonNull BillingResult billingResult) {
-            if (billingResult.getResponseCode() == OK) {
-
-                // sku for sale
-                List<QueryProductDetailsParams.Product> skuList = new ArrayList<> ();
-                skuList.add(QueryProductDetailsParams.Product.newBuilder().setProductId(SKU_NAME).setProductType(BillingClient.ProductType.INAPP).build());
-                QueryProductDetailsParams.Builder  params = QueryProductDetailsParams.newBuilder();
-                params.setProductList(skuList);
-                billingClient.queryProductDetailsAsync(params.build(), (billingResult12, list) -> {
-                    if(billingResult12.getResponseCode() == OK ){
-                        coffee = list.get(0);
-                    }
-                }
-                );
 
 
-                // slow payment
-                billingClient.queryPurchasesAsync(
-                        QueryPurchasesParams.newBuilder().setProductType(BillingClient.ProductType.INAPP).build(),
-                        (billingResultPurchases, list) -> {
-                    if(billingResultPurchases.getResponseCode() == OK) {
-                        for(Purchase purchase: list) {
-                            if (purchase.getPurchaseState() == Purchase.PurchaseState.PURCHASED) {
-                                ConsumeParams.Builder param = ConsumeParams.newBuilder();
-                                param.setPurchaseToken(purchase.getPurchaseToken());
-                                billingClient.consumeAsync(param.build(), (billingResult1, s) -> (new Handler(Looper.getMainLooper())).post(()-> webView.loadData(String.format(Locale.US, htmlHead, fontSize, printFontSize) + "<h1>Thanks !</h1>" + htmlFooter, "text/html; charset=utf-8", "utf-8")));
-                            }
-                        }
-                    }
-                });
-
-
-            }
-        }
-
-        @Override
-        public void onBillingServiceDisconnected() {
-            (new Handler(Looper.getMainLooper())).postDelayed(()->{
-                try{
-                    billingClient.startConnection(billingClientStateListener);
-                }catch (Exception ignored){}
-            },5000);
-        }
-    };
-
-
-    // fast payment
-    private final PurchasesUpdatedListener purchasesUpdatedListener = (billingResult, purchases) -> {
-        if(billingResult.getResponseCode() == OK && purchases!=null && purchases.size()>0) {
-            for(Purchase purchase: purchases) {
-                if (purchase.getPurchaseState() == Purchase.PurchaseState.PURCHASED) {
-                    ConsumeParams.Builder param = ConsumeParams.newBuilder();
-                    param.setPurchaseToken(purchase.getPurchaseToken());
-                    billingClient.consumeAsync(param.build(), new ConsumeResponseListener() {
-                        @Override
-                        public void onConsumeResponse(@NonNull BillingResult billingResult, @NonNull String s) {
-
-                            (new Handler(Looper.getMainLooper())).post(()-> webView.loadData(String.format(Locale.US, htmlHead, fontSize, printFontSize) + "<h1>Thanks !</h1>" + htmlFooter, "text/html; charset=utf-8", "utf-8"));
-
-                        }
-                    });
-                }
-            }
-        }
-    };
-
-
-    // ------------------------------------
-
-
+    FloatingActionButton fab;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -171,16 +72,9 @@ public class MainActivity extends AppCompatActivity  {
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
-        FloatingActionButton fab = findViewById(R.id.fab);
+        fab = findViewById(R.id.fab);
         fab.setOnClickListener(view -> createWebPrintJob(webView));
 
-        // ---- billing init --------
-        billingClient = BillingClient.newBuilder(this)
-                .setListener(purchasesUpdatedListener)
-                .enablePendingPurchases()
-                .build();
-        billingClient.startConnection(billingClientStateListener);
-        // -------------------
 
         webView = findViewById(R.id.wview);
 
@@ -190,6 +84,12 @@ public class MainActivity extends AppCompatActivity  {
         int savedSize = sPref.getInt(SAVED_SIZE, 1);
         setFont(savedSize);
 
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        fab.setEnabled(true);
     }
 
     // read html body from assets
@@ -300,8 +200,6 @@ public class MainActivity extends AppCompatActivity  {
         menu.add(2, 3, 7, "Font B");
         menu.add(2, 4, 8, "Font C");
         menu.add(2, 5, 9, "Font D");
-        menu.add(4, 6, 13, "Buy me a coffee");
-        menu.add(4, 10, 14, "Rate the app");
         return super.onCreateOptionsMenu(menu);
     }
 
@@ -332,28 +230,6 @@ public class MainActivity extends AppCompatActivity  {
         } else if (id == 5) {
             saveFont(4);
             setFont(4);
-        } else if (id == 6) {
-            // -------- purchase ---
-            if (coffee != null) {
-
-                ArrayList<BillingFlowParams.ProductDetailsParams> productList = new ArrayList<>();
-
-                productList.add(
-                        BillingFlowParams.ProductDetailsParams.newBuilder()
-                                .setProductDetails(coffee)
-                                .build());
-
-                BillingFlowParams billingFlowParams = BillingFlowParams.newBuilder()
-                        .setProductDetailsParamsList(productList)
-                        .build();
-
-                billingClient.launchBillingFlow(this, billingFlowParams);
-
-
-            } else {
-                Toast.makeText(this, R.string.no_bp, Toast.LENGTH_SHORT).show();
-            }
-            // -------------------
         } else if (id == 7) {
             htmlBody = readAssets("html.html");
             webView.loadData(String.format(Locale.US, htmlHead, fontSize, printFontSize) + htmlBody + htmlFooter, "text/html; charset=utf-8", "utf-8");
@@ -367,23 +243,6 @@ public class MainActivity extends AppCompatActivity  {
                 e.getStackTrace();
             }
 
-        }else if(id == 10) {
-            // Rate the app
-            Activity activity = this;
-            Log.i(TAG,"Rate start");
-            ReviewManager manager = ReviewManagerFactory.create(activity);
-            Task<ReviewInfo> request = manager.requestReviewFlow();
-            request.addOnCompleteListener(task -> {
-                if (task.isSuccessful()) {
-                    // We can get the ReviewInfo object
-                    ReviewInfo reviewInfo = task.getResult();
-                    Task<Void> flow = manager.launchReviewFlow(activity, reviewInfo);
-                    flow.addOnCompleteListener(task1 -> Log.i(TAG,"Rate flow is success"));
-                } else {
-                    // There was some problem, continue regardless of the result.
-                    Log.e(TAG,"Rate not available");
-                }
-            });
         }
         return super.onOptionsItemSelected(item);
     }
@@ -463,7 +322,7 @@ public class MainActivity extends AppCompatActivity  {
 
     //create a function to create the print job
     private void createWebPrintJob(WebView webView) {
-
+        fab.setEnabled(false);
         //create object of print manager in your device
         PrintManager printManager = (PrintManager) this.getSystemService(Context.PRINT_SERVICE);
 
